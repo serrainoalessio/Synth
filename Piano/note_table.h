@@ -16,7 +16,7 @@ uint8_t note_table[19] PROGMEM =
 #elif (PIANO_CONTROLLER_ID == 2)
 {                                                                                                                     NOTE_Si2,
  NOTE_Do3, NOTE_Reb3, NOTE_Re3, NOTE_Mib3, NOTE_Mi3, NOTE_Fa3, NOTE_Solb3, NOTE_Sol3, NOTE_Lab3, NOTE_La3, NOTE_Sib3, NOTE_Si3,
- NOTE_Do4, NOTE_Reb4, NOTE_Re4, NOTE_Mib4, NOTE_Mi4, NOTE_Fa4, }
+ NOTE_Do4, NOTE_Reb4, NOTE_Re4, NOTE_Mib4, NOTE_Mi4, NOTE_Fa4, };
 #endif  // No other piano controllers
 
 #endif // NOTETABLE_HEADER_GUARD defined

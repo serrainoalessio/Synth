@@ -1,5 +1,7 @@
+#ifndef __AVR_ATmega328P__ 
+    #define __AVR_ATmega328P__  // microcontroller
+#endif
 #define F_CPU 16000000      // frequency of the cpu
-#define __AVR_ATmega328P__  // microcontroller
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -24,10 +26,11 @@
 #endif
 
 #define NOP "nop\n\t" // asm no-operation, just waste one clock cycle
-#define IN_NOPS _14(NOP) // <<<<------------------------------- INCREASE/REDUCE SENSITIVITY <<<< --------------------
-#define TX_NOPS _25(NOP) // <<<<------------------------------- INCREASE/REDUCE TX SPEED <<<< --------------------
+#define IN_NOPS _15(NOP) // <<<<------------------------------- INCREASE/REDUCE SENSITIVITY <<<< --------------------
+#define TX_NOPS _128(NOP) // <<<<------------------------------- INCREASE/REDUCE TX SPEED <<<< --------------------
+#define SX_NOPS _75(NOP) // <<<<------------------------------- SYNCRO <<<< --------------------
 
-inline void send_message(uint8_t l_message, uint8_t h_message);
+inline void send_message(uint8_t l_message);
 uint8_t check_port(uint8_t in);
 inline void discharge_ports();
 
@@ -63,41 +66,29 @@ int main() {
         // second step: if some messages are true then send data to the synth
         for (i = 0; i < 19; i++)
             if (timing[i] == SUST + 1)
-                send_message(GET_NOTE(i), 1);
+                send_message(0x80 | GET_NOTE(i));
             else if (timing[i] == 1)
-                send_message(GET_NOTE(i), 0);
+                send_message(0x00 | GET_NOTE(i));
     }
     
     return 0;
 }
 
-inline void send_message(uint8_t l_message, uint8_t h_message) {
+inline void send_message(uint8_t message) {
     uint8_t mask = 1;
 
     // step 1: writes first bit, which is low
     PORTD0_CBI;
-    __asm__(TX_NOPS); // wait some time
+    asm volatile(TX_NOPS); // wait some time
 
     // Step 2: writes the Payload, first l_message, then h_message
     while (mask) {
-        if (l_message & mask) { // message bit is 1
+        if (message & mask) { // message bit is 1
             PORTD0_SBI;
-            __asm__(TX_NOPS); // wait some time
         } else { // message bit is 0
             PORTD0_CBI;
-            __asm__(TX_NOPS); // wait some time
         }
-        mask <<= 1;
-    }
-    mask = 1;
-    while (mask) {
-        if (h_message & mask) { // message bit is 1
-            PORTD0_SBI;
-            __asm__(TX_NOPS); // wait some time
-        } else { // message bit is 0
-            PORTD0_CBI;
-            __asm__(TX_NOPS); // wait some time
-        }
+        asm volatile(TX_NOPS); // wait some time
         mask <<= 1;
     }
 
@@ -156,7 +147,7 @@ uint8_t check_port(unsigned char in)
     *port |= bitmask; // writes 1 (connect to pull-up)
     
     //wait some time. each nop is 62.5nS on 16Mhz
-    __asm__(IN_NOPS);  // macro WAIT_NOPS writes a series of "nop", no-operation
+    asm volatile(IN_NOPS);  // macro WAIT_NOPS writes a series of "nop", no-operation
     
     if (*pin & bitmask) // if pin is HIGH there is no contact
         val = 0;

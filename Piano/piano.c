@@ -14,7 +14,7 @@
 #define PORTB_BITMASK _BV(PINB0) | _BV(PINB1) | _BV(PINB2) | _BV(PINB3) | _BV(PINB4) | _BV(PINB5)
 #define PORTC_BITMASK _BV(PINC0) | _BV(PINC1) | _BV(PINC2) | _BV(PINC3) | _BV(PINC4) | _BV(PINC5)
 
-#define SUST 100 // in loop units
+#define SUST 250 // in loop units
 
 #define INVERSE_LOGIC 0 // No inverse logic, idle status is HIGH, first bit is LOW, etc..
 #if (INVERSE_LOGIC == 0) // normal mode
@@ -26,9 +26,9 @@
 #endif
 
 #define NOP "nop\n\t" // asm no-operation, just waste one clock cycle
-#define IN_NOPS _15(NOP) // <<<<------------------------------- INCREASE/REDUCE SENSITIVITY <<<< --------------------
-#define TX_NOPS _128(NOP) // <<<<------------------------------- INCREASE/REDUCE TX SPEED <<<< --------------------
-#define SX_NOPS _75(NOP) // <<<<------------------------------- SYNCRO <<<< --------------------
+#define IN_NOPS _16(NOP) // <<<<------------------------------- INCREASE/DECREASE SENSITIVITY <<<< --------------------
+#define THRESHOLD 30     // <<<<------------------------------- INCREASE/REDUCE THRESHOLD <<<< --------------------
+#define TX_NOPS _64(NOP) // <<<<------------------------------- INCREASE/DECREASE TX SPEED <<<< --------------------
 
 inline void send_message(uint8_t l_message);
 uint8_t check_port(uint8_t in);
@@ -37,13 +37,21 @@ inline void discharge_ports();
 int main() {
     uint8_t i, id;
     uint8_t timing[19]; // This controller control 18 keys
+    uint8_t cnt[19]; // This controller control 18 keys
+    uint32_t status[19]; // This controller control 18 keys
     
     // program setup
     discharge_ports();
+    SREG = 0; // No interrupts
+    
     DDRD |= _BV(PIND0); // NOTE: Only output pin is number 0
     PORTD0_SBI;
 
-    SREG = 0; // No interrupts
+    for (i = 0; i < 19; i++) {
+        timing[i] = 0;
+        cnt[i]    = 0;
+        status[i] = 0;
+    }
     
     // main loop
     while(1) {
@@ -51,13 +59,28 @@ int main() {
         for (i = 0; i < 20; i++) {
             id = i + 1;
             if (check_port(id)) {
-                if (timing[i]) // key was already pressed
-                    timing[i] = SUST;
-                else
-                    timing[i] = SUST + 1;
+                if (!(status[i] & 0x80000000L)) // wasting a 0
+                    cnt[i]++; // added one 1
+                // else // wasting 1, cnt does not change
+                status[i] <<= 1; // shift
+                status[i] |= 1; // last added is 1
+                
+                if (cnt[i] > THRESHOLD) {
+                    if (timing[i]) // key was already pressed
+                        timing[i] = SUST;
+                    else
+                        timing[i] = SUST + 1;
+                }
             } else {
+                if (status[i] & 0x80000000L) // wasting a 1
+                    cnt[i]--; // removed one 1
+                // else // wasting 1, cnt does not change
+                status[i] <<= 1; // shift, last byte is already 1
+                
                 if (timing[i])
                     timing[i]--;
+                else
+                    status[i] = 0;
             }
         }
         
@@ -65,10 +88,11 @@ int main() {
         
         // second step: if some messages are true then send data to the synth
         for (i = 0; i < 19; i++)
-            if (timing[i] == SUST + 1)
+            if (timing[i] == SUST + 1) {
                 send_message(0x80 | GET_NOTE(i));
-            else if (timing[i] == 1)
+            } else if (timing[i] == 1) {
                 send_message(0x00 | GET_NOTE(i));
+            }
     }
     
     return 0;

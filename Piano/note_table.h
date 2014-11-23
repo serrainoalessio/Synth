@@ -6,7 +6,7 @@
 
 #define GET_NOTE(key_id) pgm_read_byte_near(note_table + key_id)
 
-#define PIANO_CONTROLLER_ID 1 // Change this to write the code for the second piano controller
+#define PIANO_CONTROLLER_ID 2 // Change this to write the code for the second piano controller
 
 uint8_t note_table[19] PROGMEM = 
 #if (PIANO_CONTROLLER_ID == 1) // Check piano controller ID

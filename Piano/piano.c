@@ -27,7 +27,7 @@
 
 #define NOP "nop\n\t" // asm no-operation, just waste one clock cycle
 #define IN_NOPS _16(NOP) // <<<<------------------------------- INCREASE/DECREASE SENSITIVITY <<<< --------------------
-#define THRESHOLD 30     // <<<<------------------------------- INCREASE/REDUCE THRESHOLD <<<< --------------------
+#define THRESHOLD 31     // <<<<------------------------------- INCREASE/REDUCE THRESHOLD <<<< --------------------
 #define TX_NOPS _64(NOP) // <<<<------------------------------- INCREASE/DECREASE TX SPEED <<<< --------------------
 
 inline void send_message(uint8_t l_message);
@@ -56,7 +56,7 @@ int main() {
     // main loop
     while(1) {
         // first step: check wether a key was pressed or not
-        for (i = 0; i < 20; i++) {
+        for (i = 0; i < 19; i++) {
             id = i + 1;
             if (check_port(id)) {
                 if (!(status[i] & 0x80000000L)) // wasting a 0
@@ -79,8 +79,6 @@ int main() {
                 
                 if (timing[i])
                     timing[i]--;
-                else
-                    status[i] = 0;
             }
         }
         
@@ -93,6 +91,8 @@ int main() {
             } else if (timing[i] == 1) {
                 send_message(0x00 | GET_NOTE(i));
             }
+
+        //_delay_us(100); // wait some time
     }
     
     return 0;
@@ -136,6 +136,7 @@ inline void discharge_ports()
 	DDRD |= bitmask_d;
 	DDRB |= bitmask_b;
 	DDRC |= bitmask_c;
+	
 	//delayMicroseconds(10); // wait some time
 }
 
@@ -167,7 +168,7 @@ uint8_t check_port(unsigned char in)
     // ports should be already discharged
     // interupts should be disabled
     
-    *ddr &= ~(bitmask); // Make the port an input (connect resistor)
+    *ddr &= ~(bitmask); // Make the port an input (connect internal resistor)
     *port |= bitmask; // writes 1 (connect to pull-up)
     
     //wait some time. each nop is 62.5nS on 16Mhz
@@ -178,7 +179,9 @@ uint8_t check_port(unsigned char in)
     else // if pin is LOW there is a key pressure
         val = 1;
     
-    // discharge ports, this will be done after
+    // discharge port, it is important to leave the pis low if you want to do multiple readings
+    *port &= ~(bitmask); // wirtes 0
+    *ddr |= bitmask; // port is now an output (disconnect internal resistor)
     // re-enable interrupts
     
     return val;
